@@ -1,0 +1,8 @@
+[package]
+name = "SystemInfo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clearscreen = "4.0.3"
+sysinfo = "0.38.2"
