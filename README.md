@@ -6,4 +6,7 @@ short desc:
 A much simpler CLI resource manager htop clone made in rust
 
 ## Can do: 
-- Show virtual & physical ram usage and total ram installed
+- Show virtual & physical ram usage.
+- Show CPU usage by core.
+- Show CPU brand name
+- Linux / windows compatible
