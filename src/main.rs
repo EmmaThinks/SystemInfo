@@ -1,14 +1,15 @@
 use ansi_term::Colour::{Blue, Green, Red, Yellow};
 use ansi_term::Style;
+use crossterm::cursor::Hide;
 use std::arch::x86_64::CpuidResult;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use crossterm::{
+    ExecutableCommand,
     cursor::MoveTo,
     event, execute,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
-    ExecutableCommand,
 };
 
 use sysinfo::{Cpu, Disk, System};
@@ -33,6 +34,7 @@ fn main() {
     //clearscreen
     execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0)).expect("Unable to clear screen");
     execute!(stdout(), Clear(ClearType::Purge)).expect("Unable to purge terminal history");
+    execute!(stdout(), Hide).expect("Unable to Hide the cursor");
 
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
 
@@ -56,6 +58,7 @@ fn main() {
     loop {
         sys.refresh_all();
 
+        show_cpu_usage(&sys);
         show_ram(&sys, total_cores);
 
         std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
@@ -76,4 +79,8 @@ fn show_ram(system: &System, total_cores: usize) {
         .expect("Unable to update");
     print!("{:.2}", used_swap);
     stdout().flush().expect("Unable to update");
+}
+
+fn show_cpu_usage(system: &System) {
+    //11, 5 start
 }
