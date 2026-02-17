@@ -1,19 +1,15 @@
-use ansi_term::Colour::{Blue, Green, Red, Yellow};
-use ansi_term::Style;
+use ansi_term::Colour::Green;
 
 use std::io::{stdout, Write};
 
 use crossterm::{
-    cursor::Hide,
-    cursor::MoveTo,
-    event, execute,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-    terminal::SetSize,
-    terminal::{Clear, ClearType},
+    cursor::{Hide, MoveTo, Show},
+    execute,
+    terminal::{Clear, ClearType, SetSize},
     ExecutableCommand,
 };
 
-use sysinfo::{Cpu, Disk, System};
+use sysinfo::System;
 
 fn main() {
     //refresh all
