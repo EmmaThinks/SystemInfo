@@ -32,7 +32,7 @@ fn main() {
     execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0)).expect("Unable to clear screen");
     execute!(stdout(), Clear(ClearType::Purge)).expect("Unable to purge terminal history");
     execute!(stdout(), Hide).expect("Unable to Hide the cursor");
-    execute!(stdout(), SetSize(80, 40)).expect("Unable to set the terminal size");
+    execute!(stdout(), SetSize(130, 40)).expect("Unable to set the terminal size");
 
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
 
