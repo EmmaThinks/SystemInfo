@@ -1,9 +1,9 @@
 # INFO MANAGER
 
-this is my first Rust project just made to learn, i'll be updating whenever i can
+this is my first Rust project just made to learn.
 
-short desc:
-A much simpler CLI resource manager htop clone made in rust
+## Short Description: 
+It tends to be a resource manager for my next pc upgrade, display this in a separate screen from my principal monitors so i can see what's happening without changing my apps.
 
 ## Can do: 
 - Show virtual & physical ram usage.
