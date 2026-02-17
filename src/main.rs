@@ -1,15 +1,16 @@
 use ansi_term::Colour::{Blue, Green, Red, Yellow};
 use ansi_term::Style;
-use crossterm::cursor::Hide;
-use std::arch::x86_64::CpuidResult;
-use std::io::{Write, stdout};
+
+use std::io::{stdout, Write};
 
 use crossterm::{
-    ExecutableCommand,
+    cursor::Hide,
     cursor::MoveTo,
     event, execute,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    terminal::SetSize,
     terminal::{Clear, ClearType},
+    ExecutableCommand,
 };
 
 use sysinfo::{Cpu, Disk, System};
@@ -35,6 +36,7 @@ fn main() {
     execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0)).expect("Unable to clear screen");
     execute!(stdout(), Clear(ClearType::Purge)).expect("Unable to purge terminal history");
     execute!(stdout(), Hide).expect("Unable to Hide the cursor");
+    execute!(stdout(), SetSize(80, 40)).expect("Unable to set the terminal size");
 
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
 
@@ -46,7 +48,7 @@ fn main() {
     println!("   Total Cores: {} Cores", total_cores);
     for cpu in sys.cpus() {
         i += 1;
-        print!("   Core {} {}\n", i, cpu.cpu_usage());
+        print!("   Core {} \n", i);
     }
     println!(
         "MEMORY SECTION:              [ {:.2} GB physical memory ] [ {:.2} GB virtual memory]",
@@ -58,8 +60,8 @@ fn main() {
     loop {
         sys.refresh_all();
 
-        show_cpu_usage(&sys);
         show_ram(&sys, total_cores);
+        show_cpu_usage(&sys);
 
         std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
     }
@@ -82,5 +84,15 @@ fn show_ram(system: &System, total_cores: usize) {
 }
 
 fn show_cpu_usage(system: &System) {
+    let mut cpu_counter = 3;
     //11, 5 start
+    for cpu in system.cpus() {
+        cpu_counter += 1;
+        stdout()
+            .execute(MoveTo(13, cpu_counter))
+            .expect("Unable to update");
+        print!("{:.2}  ", cpu.cpu_usage());
+        stdout().flush().expect("Unable to update");
+    }
+    cpu_counter = 3;
 }
