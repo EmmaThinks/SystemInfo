@@ -1,12 +1,14 @@
 use ansi_term::Colour::Green;
 
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use crossterm::{
-    cursor::{Hide, MoveTo, Show},
-    execute,
-    terminal::{Clear, ClearType, SetSize},
     ExecutableCommand,
+    cursor::{Hide, MoveTo, Show},
+    event::{self, Event, KeyCode, KeyModifiers},
+    execute,
+    style::Print,
+    terminal::{Clear, ClearType, SetSize},
 };
 
 use sysinfo::System;
@@ -17,8 +19,6 @@ fn main() {
     // non - changing vars
     let total_ram = (sys.total_memory() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
     let total_swap = (sys.total_swap() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
-    let mut used_ram = 0;
-    let mut used_swap = 0;
     let total_cores: usize = sys.cpus().len();
     let cpu_name: String = sys
         .cpus()
@@ -50,8 +50,8 @@ fn main() {
         "MEMORY SECTION:              [ {:.2} GB physical memory ] [ {:.2} GB virtual memory]",
         total_ram, total_swap
     );
-    println!("   Physical memory used: {}", used_ram);
-    println!("   Virtual memory used:  {}", used_ram);
+    println!("   Physical memory used: -");
+    println!("   Virtual memory used:  -");
 
     loop {
         sys.refresh_all();
@@ -59,7 +59,7 @@ fn main() {
         show_ram(&sys, total_cores);
         show_cpu_usage(&sys);
 
-        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 
@@ -81,14 +81,27 @@ fn show_ram(system: &System, total_cores: usize) {
 
 fn show_cpu_usage(system: &System) {
     let mut cpu_counter = 3;
+    let bar = "||||||||||";
     //11, 5 start
     for cpu in system.cpus() {
         cpu_counter += 1;
         stdout()
             .execute(MoveTo(13, cpu_counter))
-            .expect("Unable to update");
-        print!("{:.2}  ", cpu.cpu_usage());
+            .expect("Unable to Move");
+        print!("[..........] {:.2}%  ", cpu.cpu_usage());
         stdout().flush().expect("Unable to update");
+
+        stdout()
+            .execute(MoveTo(14, cpu_counter))
+            .expect("Unable to Move");
+
+        print!(
+            "{}",
+            &bar[0..((cpu.cpu_usage() as i32) / 10).min(10) as usize]
+        );
+        stdout().flush().expect("Unable to print");
     }
     cpu_counter = 3;
 }
+
+fn show_gpu_usage() {}
