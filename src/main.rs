@@ -1,14 +1,14 @@
 use ansi_term::Colour::Green;
 
-use std::io::{Write, stdout};
+use std::io::{stdout, Write};
 
 use crossterm::{
-    ExecutableCommand,
     cursor::{Hide, MoveTo, Show},
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
     style::Print,
     terminal::{Clear, ClearType, SetSize},
+    ExecutableCommand,
 };
 
 use sysinfo::System;
@@ -27,6 +27,8 @@ fn main() {
         .unwrap_or("Unknown CPU".to_string());
     let prog_version = Green.paint("v0.3");
     let mut i: i8 = 0;
+    let dot_char = ".";
+    let swap_dots = (total_swap / 2 as f32) as f32;
 
     //clearscreen
     execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0)).expect("Unable to clear screen");
@@ -36,10 +38,7 @@ fn main() {
 
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
 
-    println!(
-        "              --SYSTEM INFO--             {}\n",
-        prog_version
-    );
+    println!("              --OVERSEER--             {}\n", prog_version);
     println!("CPU SECTION:                        [ {} ]", cpu_name);
     println!("   Total Cores: {} Cores", total_cores);
     for cpu in sys.cpus() {
@@ -50,13 +49,19 @@ fn main() {
         "MEMORY SECTION:              [ {:.2} GB physical memory ] [ {:.2} GB virtual memory]",
         total_ram, total_swap
     );
-    println!("   Physical memory used: -");
-    println!("   Virtual memory used:  -");
 
+    println!(
+        "   Physical memory used: [{}]",
+        dot_char.repeat(((total_ram / 2.0) as f32).round() as usize)
+    );
+    println!(
+        "   Virtual memory used:  [{}]",
+        dot_char.repeat(((total_swap / 2.0) as f32).round() as usize)
+    );
     loop {
         sys.refresh_all();
 
-        show_ram(&sys, total_cores);
+        show_ram(&sys, total_cores, total_ram, total_swap);
         show_cpu_usage(&sys);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -64,21 +69,44 @@ fn main() {
 }
 
 // function to show ram and virtual ram
-fn show_ram(system: &System, total_cores: usize) {
+fn show_ram(system: &System, total_cores: usize, tot_ram: f32, tot_swap: f32) {
     let used_ram = (system.used_memory() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
-    stdout()
-        .execute(MoveTo(25, total_cores as u16 + 5))
-        .expect("Unable to update");
-    print!("{:.2}", used_ram);
-    stdout().flush().expect("Unable to update");
     let used_swap = (system.used_swap() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
-    stdout()
-        .execute(MoveTo(25, total_cores as u16 + 6))
-        .expect("Unable to update");
-    print!("{:.2}", used_swap);
-    stdout().flush().expect("Unable to update");
-}
+    let bar_char = "|";
 
+    //ram part
+    stdout()
+        .execute(MoveTo(26, total_cores as u16 + 5))
+        .expect("Unable to Update");
+    print!("{}", bar_char.repeat((used_ram.floor() as usize) / 2));
+
+    stdout()
+        .execute(MoveTo(
+            ((28.0 + (tot_ram / 2.0)).round()) as u16,
+            total_cores as u16 + 5,
+        ))
+        .expect("Unable to update");
+    print!("{:.2} GB ", used_ram);
+    stdout().flush().expect("Unable to update");
+    //end ram part
+
+    // swap part
+    stdout()
+        .execute(MoveTo(26, total_cores as u16 + 6))
+        .expect("Unable to Update");
+    print!("{}", bar_char.repeat((used_swap.floor() as usize) / 2));
+
+    stdout()
+        .execute(MoveTo(
+            ((28.0 + (tot_swap / 2.0)).round()) as u16,
+            total_cores as u16 + 6,
+        ))
+        .expect("Unable to update");
+    print!("{:.2} GB ", used_swap);
+    stdout().flush().expect("Unable to update");
+    //end swap part
+}
+//function to show cpu usage by core
 fn show_cpu_usage(system: &System) {
     let mut cpu_counter = 3;
     let bar = "||||||||||";
