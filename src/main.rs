@@ -11,11 +11,12 @@ use crossterm::{
     ExecutableCommand,
 };
 
-use sysinfo::System;
+use sysinfo::{Disk, Disks, System};
 
 fn main() {
     //refresh all
     let mut sys = System::new_all();
+    let mut disks = Disks::new_with_refreshed_list();
     // non - changing vars
     let total_ram = (sys.total_memory() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
     let total_swap = (sys.total_swap() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
@@ -25,10 +26,9 @@ fn main() {
         .first()
         .map(|cpu| cpu.brand().to_string())
         .unwrap_or("Unknown CPU".to_string());
-    let prog_version = Green.paint("v0.3");
+    let prog_version = Green.paint("v0.5");
     let mut i: i8 = 0;
     let dot_char = ".";
-    let swap_dots = (total_swap / 2 as f32) as f32;
 
     //clearscreen
     execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0)).expect("Unable to clear screen");
@@ -58,11 +58,18 @@ fn main() {
         "   Virtual memory used:  [{}]",
         dot_char.repeat(((total_swap / 2.0) as f32).round() as usize)
     );
+    println!("DISKS SECTION:");
+    for disk in disks.list() {
+        println!("   {}", disk.name().to_string_lossy());
+        stdout().flush().expect("Unable to update");
+    }
+
     loop {
         sys.refresh_all();
 
         show_ram(&sys, total_cores, total_ram, total_swap);
         show_cpu_usage(&sys);
+        show_disk_usage(total_cores, &disks);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
@@ -129,7 +136,24 @@ fn show_cpu_usage(system: &System) {
         );
         stdout().flush().expect("Unable to print");
     }
-    cpu_counter = 3;
 }
 
-fn show_gpu_usage() {}
+fn show_disk_usage(total_cores: usize, disks: &Disks) {
+    let mut row_counter = total_cores as u16 + 8;
+    let column_x = 25;
+
+    for disk in disks.list() {
+        stdout()
+            .execute(MoveTo(column_x, row_counter))
+            .expect("unable to update");
+
+        print!(
+            " {} / {} GB      ",
+            (disk.total_space() - disk.available_space()) / 1024 / 1024 / 1024,
+            disk.total_space() / 1024 / 1024 / 1024
+        );
+
+        row_counter += 1;
+    }
+    stdout().flush().expect("Unable to update disks");
+}
