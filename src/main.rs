@@ -1,14 +1,14 @@
 use ansi_term::Colour::Green;
 
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use crossterm::{
+    ExecutableCommand,
     cursor::{Hide, MoveTo, Show},
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
     style::Print,
     terminal::{Clear, ClearType, SetSize},
-    ExecutableCommand,
 };
 
 use sysinfo::{Disk, Disks, System};
@@ -60,7 +60,11 @@ fn main() {
     );
     println!("DISKS SECTION:");
     for disk in disks.list() {
-        println!("   {}", disk.name().to_string_lossy());
+        if disk.name().to_string_lossy().is_empty() {
+            print!("   {}", disk.mount_point().display());
+        } else {
+            println!("   {}", disk.name().to_string_lossy());
+        }
         stdout().flush().expect("Unable to update");
     }
 
