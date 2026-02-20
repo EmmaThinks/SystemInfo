@@ -1,22 +1,27 @@
-use ansi_term::Colour::Green;
+use ansi_term::{ANSIGenericString, Color::Red, Colour::Green};
 
-use std::io::{Write, stdout};
-
-use crossterm::{
-    ExecutableCommand,
-    cursor::{Hide, MoveTo, Show},
-    event::{self, Event, KeyCode, KeyModifiers},
-    execute,
-    style::Print,
-    terminal::{Clear, ClearType, SetSize},
+use std::{
+    io::{self, stdout, Write},
+    thread,
+    time::{self, Duration},
 };
 
-use sysinfo::{Disk, Disks, System};
+use crossterm::{
+    cursor::{Hide, MoveTo, Show},
+    event::{self, read, Event, KeyCode, KeyModifiers},
+    execute,
+    style::Print,
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType, SetSize},
+    ExecutableCommand,
+};
+
+use sysinfo::{Components, Disk, Disks, System};
 
 fn main() {
     //refresh all
     let mut sys = System::new_all();
-    let mut disks = Disks::new_with_refreshed_list();
+    let mut component = Components::new_with_refreshed_list();
+    let disks = Disks::new_with_refreshed_list();
     // non - changing vars
     let total_ram = (sys.total_memory() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
     let total_swap = (sys.total_swap() as f32) / (1024 as f32) / (1024 as f32) / (1024 as f32);
@@ -26,7 +31,7 @@ fn main() {
         .first()
         .map(|cpu| cpu.brand().to_string())
         .unwrap_or("Unknown CPU".to_string());
-    let prog_version = Green.paint("v0.5");
+    let prog_version = Green.paint("v0.7");
     let mut i: i8 = 0;
     let dot_char = ".";
 
@@ -36,17 +41,15 @@ fn main() {
     execute!(stdout(), Hide).expect("Unable to Hide the cursor");
     execute!(stdout(), SetSize(130, 40)).expect("Unable to set the terminal size");
 
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-
     println!("              --OVERSEER--             {}\n", prog_version);
-    println!("CPU SECTION:                        [ {} ]", cpu_name);
+    println!("CPU SECTION:     [ {} ]", cpu_name);
     println!("   Total Cores: {} Cores", total_cores);
     for cpu in sys.cpus() {
         i += 1;
         print!("   Core {} \n", i);
     }
     println!(
-        "MEMORY SECTION:              [ {:.2} GB physical memory ] [ {:.2} GB virtual memory]",
+        "MEMORY SECTION:     [ {:.2} GB physical memory ] [ {:.2} GB virtual memory]",
         total_ram, total_swap
     );
 
@@ -60,22 +63,20 @@ fn main() {
     );
     println!("DISKS SECTION:");
     for disk in disks.list() {
-        if disk.name().to_string_lossy().is_empty() {
-            print!("   {}", disk.mount_point().display());
-        } else {
-            println!("   {}", disk.name().to_string_lossy());
-        }
+        println!("   {}", disk.mount_point().display());
         stdout().flush().expect("Unable to update");
     }
-
     loop {
         sys.refresh_all();
+        component.refresh(true);
 
+        // all functions
         show_ram(&sys, total_cores, total_ram, total_swap);
-        show_cpu_usage(&sys);
+        show_cpu_usage(&sys, &component);
         show_disk_usage(total_cores, &disks);
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        // function with poll to let processor have time to calculate metrics while looks for events
+        check_for_event(std::time::Duration::from_secs(1));
     }
 }
 
@@ -98,7 +99,6 @@ fn show_ram(system: &System, total_cores: usize, tot_ram: f32, tot_swap: f32) {
         ))
         .expect("Unable to update");
     print!("{:.2} GB ", used_ram);
-    stdout().flush().expect("Unable to update");
     //end ram part
 
     // swap part
@@ -118,7 +118,7 @@ fn show_ram(system: &System, total_cores: usize, tot_ram: f32, tot_swap: f32) {
     //end swap part
 }
 //function to show cpu usage by core
-fn show_cpu_usage(system: &System) {
+fn show_cpu_usage(system: &System, comp: &Components) {
     let mut cpu_counter = 3;
     let bar = "||||||||||";
     //11, 5 start
@@ -127,8 +127,7 @@ fn show_cpu_usage(system: &System) {
         stdout()
             .execute(MoveTo(13, cpu_counter))
             .expect("Unable to Move");
-        print!("[..........] {:.2}%  ", cpu.cpu_usage());
-        stdout().flush().expect("Unable to update");
+        print!("[..........] {:.2}% ", cpu.cpu_usage());
 
         stdout()
             .execute(MoveTo(14, cpu_counter))
@@ -140,24 +139,61 @@ fn show_cpu_usage(system: &System) {
         );
         stdout().flush().expect("Unable to print");
     }
+
+    for components in comp {
+        if components.label() == "k10temp Tctl" {
+            let temp = components.temperature().unwrap_or(0.0) as f32;
+            stdout().execute(MoveTo(60, 2)).expect("Unable to Move");
+            if temp > 85.0 {
+                print!("\x1b[31m[{:.2} °C]  \x1b[31m  ", temp);
+            } else if temp > 60.0 {
+                print!("\x1b[33m[{:.2} °C]  \x1b[33m", temp);
+            } else if temp > 30.0 {
+                print!("\x1b[32m[{:.2} °C]  \x1b[32m", temp);
+            } else if temp < 30.0 {
+                print!("\x1b[36m[{:.2} °C]  \x1b[36m", temp);
+            }
+            print!("\x1B[0m");
+            stdout().flush().expect("Unable to print");
+        }
+    }
 }
 
 fn show_disk_usage(total_cores: usize, disks: &Disks) {
     let mut row_counter = total_cores as u16 + 8;
-    let column_x = 25;
 
     for disk in disks.list() {
         stdout()
-            .execute(MoveTo(column_x, row_counter))
+            .execute(MoveTo(25, row_counter))
             .expect("unable to update");
 
         print!(
-            " {} / {} GB      ",
+            " {} | {} GB     Read: {}/MBs | Write {}/MBs",
             (disk.total_space() - disk.available_space()) / 1024 / 1024 / 1024,
-            disk.total_space() / 1024 / 1024 / 1024
+            disk.total_space() / 1024 / 1024 / 1024,
+            disk.usage().read_bytes / 1024 / 1024,
+            disk.usage().written_bytes / 1024 / 1024
         );
 
         row_counter += 1;
     }
     stdout().flush().expect("Unable to update disks");
+}
+
+fn check_for_event(timeout: Duration) {
+    enable_raw_mode().expect("Unable to enter raw mode");
+    if event::poll(timeout).expect("Unable to make poll") {
+        match read().expect("Unable to get the event") {
+            Event::Resize(columns, rows) => {}
+            Event::Key(event) => {
+                if event.code == event::KeyCode::Char('q') {
+                    execute!(stdout(), Show).expect("Unable to Hide the cursor");
+                    disable_raw_mode().expect("Unable to exit the program");
+                    std::process::exit(0);
+                }
+            }
+            _ => {}
+        }
+    }
+    disable_raw_mode().expect("Unable to exit the program");
 }
